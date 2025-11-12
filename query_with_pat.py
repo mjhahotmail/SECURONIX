@@ -14,7 +14,7 @@ def main():
 
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT CURRENT_TIMESTAMP(), CURRENT_USER(), CURRENT_ROLE();")
+        cursor.execute("CREATE DATABASE TESTDB1;")
         for row in cursor:
             print("Query Result:", row)
     finally:
@@ -22,4 +22,5 @@ def main():
         conn.close()
 
 if __name__ == "__main__":
+
     main()
