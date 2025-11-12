@@ -1,0 +1,40 @@
+name: Deploy Snowflake Query on PR Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main # Target branch where the PR is merged into
+
+jobs:
+  execute-snowflake-query:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Snowflake CLI
+        uses: snowflakedb/snowflake-cli-action@v1 # Use the official Snowflake CLI action
+        with:
+          snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
+          snowflake_role: ${{ secrets.SNOWFLAKE_ROLE }}
+          snowflake_warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          snowflake_database: ${{ secrets.SNOWFLAKE_DATABASE }}
+          snowflake_schema: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          # For Key Pair Auth:
+          snowflake_private_key: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          # For PAT Auth:
+          # snowflake_pat: ${{ secrets.SNOWFLAKE_PAT }} 
+
+      - name: Execute Snowflake SQL query
+        run: |
+          # Use the Snowflake CLI to run your query/script
+          snow sql -q "CALL MY_STORED_PROCEDURE('${{ github.event.pull_request.head.ref }}');" 
+          # Or run a SQL file from your repository:
+          # snow sql -f ./path/to/your/script.sql
+          # Or use the EXECUTE IMMEDIATE FROM command if you have Git integration set up within Snowflake:
+          # snow sql -q "EXECUTE IMMEDIATE FROM @your_git_repo/branches/main/path/to/your/script.sql"
