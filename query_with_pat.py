@@ -14,7 +14,7 @@ def main():
 
     cursor = conn.cursor()
     try:
-        cursor.execute("CREATE DATABASE TESTDB1;")
+        cursor.execute("CREATE or replace DATABASE TESTDB2;")
         for row in cursor:
             print("Query Result:", row)
     finally:
@@ -24,3 +24,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+
