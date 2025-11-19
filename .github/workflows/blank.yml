@@ -1,40 +1,64 @@
-name: Deploy Snowflake Query on PR Merge
+name: Execute Snowflake Query on PR Merge
 
 on:
   pull_request:
-    types:
-      - closed
     branches:
-      - main # Target branch where the PR is merged into
+      - main # Or your target branch
+    types: [closed]
 
 jobs:
-  execute-snowflake-query:
+  execute_snowflake_query:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Snowflake CLI
-        uses: snowflakedb/snowflake-cli-action@v1 # Use the official Snowflake CLI action
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          snowflake_user: ${{ secrets.SNOWFLAKE_USER }}
-          snowflake_role: ${{ secrets.SNOWFLAKE_ROLE }}
-          snowflake_warehouse: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          snowflake_database: ${{ secrets.SNOWFLAKE_DATABASE }}
-          snowflake_schema: ${{ secrets.SNOWFLAKE_SCHEMA }}
-          # For Key Pair Auth:
-          snowflake_private_key: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
-          # For PAT Auth:
-          # snowflake_pat: ${{ secrets.SNOWFLAKE_PAT }} 
+          python-version: '3.x' # Specify a suitable Python version
 
-      - name: Execute Snowflake SQL query
+      - name: Install Snowflake Connector
+        run: pip install snowflake-connector-python
+
+      - name: Create private key file (if using key pair)
         run: |
-          # Use the Snowflake CLI to run your query/script
-          snow sql -q "CALL MY_STORED_PROCEDURE('${{ github.event.pull_request.head.ref }}');" 
-          # Or run a SQL file from your repository:
-          # snow sql -f ./path/to/your/script.sql
-          # Or use the EXECUTE IMMEDIATE FROM command if you have Git integration set up within Snowflake:
-          # snow sql -q "EXECUTE IMMEDIATE FROM @your_git_repo/branches/main/path/to/your/script.sql"
+          echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > private_key.p8
+          chmod 600 private_key.p8
+        if: ${{ secrets.SNOWFLAKE_PRIVATE_KEY != '' }}
+
+      - name: Execute Snowflake query
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8 # Path to the created key file
+          SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
+        run: |
+          python -c "
+import snowflake.connector
+import os
+
+conn = snowflake.connector.connect(
+    user=os.environ['SNOWFLAKE_USER'],
+    account=os.environ['SNOWFLAKE_ACCOUNT'],
+    warehouse=os.environ['SNOWFLAKE_WAREHOUSE'],
+    database=os.environ['SNOWFLAKE_DATABASE'],
+    schema=os.environ['SNOWFLAKE_SCHEMA'],
+    role=os.environ['SNOWFLAKE_ROLE'],
+    private_key_path=os.environ.get('SNOWFLAKE_PRIVATE_KEY_PATH'),
+    private_key_passphrase=os.environ.get('SNOWFLAKE_PRIVATE_KEY_PASSPHRASE')
+)
+
+try:
+    with conn.cursor() as cursor:
+        cursor.execute('INSERT INTO your_table (column1, column2) VALUES (\'value1\', \'value2\');') # Replace with your query
+    print('Query executed successfully!')
+finally:
+    conn.close()
+"
